@@ -359,6 +359,94 @@ TP rate 99.3% 기준 false-positive rate 비교:
 
 ---
 
+## 10. 기타 Open-Weight Turn Detection 모델 조사
+
+NAMO, LiveKit, Turnsense 외에 한국어 적용 가능한 open-weight 모델을 추가 조사한 결과입니다.
+
+### Smart Turn v3 / v3.1 (Pipecat / Daily.co)
+
+| 항목 | 값 |
+|------|---|
+| **개발** | Pipecat (Daily.co) |
+| **베이스 모델** | Whisper Tiny 인코더 (39M) + Linear 분류 헤드 |
+| **파라미터 수** | ~8M |
+| **모델 크기** | **8MB** (CPU, int8) / 32MB (GPU) |
+| **추론 속도** | **12ms** (CPU) / 3.3ms (GPU) |
+| **입력 방식** | **오디오 기반** (텍스트 아님) |
+| **한국어 정확도** | 96.85% (v3 기준) |
+| **지원 언어** | 23개 (한국어 포함) |
+| **라이선스** | BSD 2-Clause (가중치 + 학습 데이터 + 스크립트 모두 공개) |
+| **GitHub** | [pipecat-ai/smart-turn](https://github.com/pipecat-ai/smart-turn) |
+| **HuggingFace** | [pipecat-ai/smart-turn-v3](https://huggingface.co/pipecat-ai/smart-turn-v3) |
+
+- NAMO/LiveKit과 달리 **STT 없이 오디오 파형을 직접 분석**하여 턴 완료 판별
+- Whisper의 인코더만 사용하고 디코더는 제거, Linear 분류 헤드를 추가한 구조
+- 8MB로 현존하는 turn detection 모델 중 가장 경량 (NAMO 135MB의 1/17)
+- 언어별 filler word 리스트를 학습 데이터에 주입하여 "음...", "그..." 등의 처리 강화
+- v3.1에서 영어/스페인어 정확도 개선 (영어 88.3% → 94.7%)
+
+### TEN Turn Detection (TEN Framework / Agora)
+
+| 항목 | 값 |
+|------|---|
+| **개발** | TEN Framework (Agora) |
+| **베이스 모델** | Qwen2.5-7B |
+| **파라미터 수** | ~8B (BF16) |
+| **모델 크기** | ~16GB |
+| **입력 방식** | 텍스트 기반 |
+| **지원 언어** | 영어, 중국어만 (**한국어 미지원**) |
+| **라이선스** | Apache 2.0 |
+| **출력** | 3-class (finished / unfinished / wait) |
+| **HuggingFace** | [TEN-framework/TEN_Turn_Detection](https://huggingface.co/TEN-framework/TEN_Turn_Detection) |
+
+- 7B 모델을 그대로 사용하여 크기가 매우 큼 (~16GB)
+- "wait" 클래스 (사용자가 AI에게 말하지 말라고 지시)를 별도로 분류하는 점이 독특
+- 한국어 미지원으로 본 프로젝트에서는 제외
+
+### NVIDIA Parakeet-Realtime-EOU-120M
+
+| 항목 | 값 |
+|------|---|
+| **개발** | NVIDIA |
+| **파라미터 수** | ~120M |
+| **입력 방식** | 오디오 기반 (스트리밍 ASR + EOU 통합) |
+| **지원 언어** | **영어만** (한국어 미지원) |
+| **출력** | ASR 텍스트 + `<EOU>` 토큰 |
+| **HuggingFace** | [nvidia/parakeet_realtime_eou_120m-v1](https://huggingface.co/nvidia/parakeet_realtime_eou_120m-v1) |
+
+- ASR과 EOU 감지를 단일 모델로 통합한 접근
+- 스트리밍 ASR 과정에서 `<EOU>` 특수 토큰을 출력하여 턴 완료를 표시
+- 영어만 지원. NVIDIA의 다국어 ASR 모델(parakeet-1.1b-rnnt)은 한국어 지원하나 EOU 기능 없음
+
+### Krisp Turn-Taking
+
+| 항목 | 값 |
+|------|---|
+| **개발** | Krisp |
+| **파라미터 수** | ~6M |
+| **입력 방식** | 오디오 기반 |
+| **공개 여부** | **비공개** (VIVA SDK를 통해서만 사용) |
+
+- 6M 파라미터로 매우 경량이나 가중치 비공개
+- 오디오 기반으로 연속 확률 점수(0~1) 출력
+
+### 한국어 지원 Open-Weight 모델 최종 정리
+
+| 모델 | 한국어 | 입력 방식 | 모델 크기 | 추론 속도 | 라이선스 |
+|------|--------|----------|----------|----------|---------|
+| **NAMO** | ✅ (96.85%) | 텍스트 | 135-295MB | <19-29ms | Apache 2.0 |
+| **LiveKit** | ✅ (TNR 94.5%) | 텍스트 | 66-281MB | 15-160ms | 커스텀 |
+| **Smart Turn v3** | ✅ (96.85%) | **오디오** | **8MB** | **12ms** | BSD 2-Clause |
+| TEN | ❌ (영+중만) | 텍스트 | ~16GB | - | Apache 2.0 |
+| NVIDIA EOU | ❌ (영어만) | 오디오 | ~240MB | 80-160ms | 커스텀 |
+| Krisp | 불명 | 오디오 | ~65MB | - | **비공개** |
+| Turnsense | ❌ (영어만) | 텍스트 | ~270MB | - | Apache 2.0 |
+
+**결론**: 한국어를 지원하는 open-weight turn detection 모델은 **NAMO, LiveKit, Smart Turn v3** 세 가지.
+Smart Turn v3는 오디오 기반이라 텍스트 기반인 NAMO/LiveKit과는 접근 방식이 근본적으로 다름.
+
+---
+
 ## 참고 자료
 
 - [NAMO Turn Detector v1 - GitHub](https://github.com/videosdk-live/NAMO-Turn-Detector-v1)
@@ -368,3 +456,9 @@ TP rate 99.3% 기준 false-positive rate 비교:
 - [Turnsense - GitHub](https://github.com/latishab/turnsense)
 - [Turnsense - Latisha Besariani](https://latishab.com/turnsense)
 - [TURNS-2K Dataset - Hugging Face](https://huggingface.co/datasets/latishab/turns-2k)
+- [Smart Turn v3 블로그](https://www.daily.co/blog/announcing-smart-turn-v3-with-cpu-inference-in-just-12ms/)
+- [Smart Turn v3 - HuggingFace](https://huggingface.co/pipecat-ai/smart-turn-v3)
+- [Smart Turn - GitHub](https://github.com/pipecat-ai/smart-turn)
+- [TEN Turn Detection - HuggingFace](https://huggingface.co/TEN-framework/TEN_Turn_Detection)
+- [NVIDIA Parakeet EOU - HuggingFace](https://huggingface.co/nvidia/parakeet_realtime_eou_120m-v1)
+- [Krisp Turn-Taking 블로그](https://krisp.ai/blog/turn-taking-for-voice-ai/)
