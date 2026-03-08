@@ -11,7 +11,7 @@ NAMO Turn Detector, LiveKit Turn Detector, Turnsense 세 프로젝트를 비교 
 | **개발** | VideoSDK | LiveKit | Latisha Besariani (개인) |
 | **기반 모델** | mmBERT (다국어) / DistilBERT (단일언어) | Qwen2.5-0.5B (다국어) / SmolLM2-135M (영어) | SmolLM2-135M |
 | **모델 크기** | ~135MB (단일) / ~295MB (다국어) | ~66MB (영어) / ~281MB (다국어) | ~135M 파라미터 |
-| **라이선스** | Apache 2.0 | Open-weights (커스텀) | Apache 2.0 |
+| **라이선스** | Apache 2.0 | LiveKit Model License (제약 있음) | Apache 2.0 |
 | **GitHub** | [videosdk-live/NAMO-Turn-Detector-v1](https://github.com/videosdk-live/NAMO-Turn-Detector-v1) | [livekit/agents](https://github.com/livekit/agents/tree/main/livekit-plugins/livekit-plugins-turn-detector) | [latishab/turnsense](https://github.com/latishab/turnsense) |
 
 ---
@@ -274,18 +274,51 @@ TP rate 99.3% 기준 false-positive rate 비교:
 | 프로젝트 | 강점 | 약점 |
 |----------|------|------|
 | **NAMO** | 가장 빠른 추론 속도(<19ms), 23개 언어 지원, ONNX 최적화 | 자체 SDK 종속성, 평가 데이터셋 비공개 |
-| **LiveKit** | Knowledge Distillation으로 높은 품질, 가장 성숙한 생태계, 지속적 개선 | 다국어 모델 추론이 상대적으로 느림(50~160ms) |
+| **LiveKit** | Knowledge Distillation으로 높은 품질, 가장 성숙한 생태계, 지속적 개선 | 다국어 모델 추론이 상대적으로 느림(50~160ms), **라이선스 제약** |
 | **Turnsense** | 초경량 엣지 배포 가능, 완전 오픈소스, Apache 2.0, 공개 데이터셋 | 영어만 지원, 학습 데이터 2,000개로 적음, 벤치마크 검증 부족 |
 
 ### 용도별 추천
 
 - **프로덕션 다국어 환경 (속도 우선)**: NAMO
-- **프로덕션 다국어 환경 (생태계/품질 우선)**: LiveKit
+- **프로덕션 다국어 환경 (생태계/품질 우선)**: LiveKit (라이선스 제약 주의)
 - **엣지 디바이스 / 경량 실험**: Turnsense
 
 ---
 
-## 9. NAMO 한국어 특화 모델 실측 테스트 결과
+## 9. 라이선스 상세 비교
+
+### LiveKit Model License 주요 제약
+
+LiveKit 모델은 Apache 2.0이 아닌 독자적인 **"LiveKit Model License"** 를 사용한다.
+무료(royalty-free)이지만 다음 3가지 핵심 제약이 있다:
+
+1. **LiveKit Agents 프레임워크 전용** — 모델을 독립 실행(standalone)하거나 다른 프레임워크에서 사용하는 것을 금지
+2. **다른 모델 개선에 사용 금지** — LiveKit 모델의 출력물로 다른 (비-LiveKit) 모델을 학습하거나 개선하는 것을 금지
+3. **배포 시 라이선스 조건 유지** — 파생물 배포 시 동일 라이선스 동의 필요
+
+라이선스 원문: [LICENSE (HuggingFace)](https://huggingface.co/livekit/turn-detector/blob/main/LICENSE)
+
+### 모델별 라이선스 비교
+
+| 항목 | NAMO | LiveKit | Smart Turn v3 | Turnsense |
+|------|------|---------|---------------|-----------|
+| **라이선스** | Apache 2.0 | LiveKit Model License | BSD 2-Clause | Apache 2.0 |
+| **독립 사용 (standalone)** | ✅ 자유 | ❌ LiveKit Agents만 | ✅ 자유 | ✅ 자유 |
+| **다른 모델 학습에 활용** | ✅ 가능 | ❌ 금지 | ✅ 가능 | ✅ 가능 |
+| **상업적 사용** | ✅ | ✅ (제약 하) | ✅ | ✅ |
+| **파생물 배포** | ✅ | ✅ (동일 라이선스) | ✅ | ✅ |
+| **학습 데이터 공개** | ❌ | ❌ | ✅ | ✅ |
+| **학습 코드 공개** | ✅ (Colab) | ❌ | ✅ | ✅ |
+
+### 실무적 시사점
+
+- 본 프로젝트의 데모처럼 **LiveKit Agents 없이 ONNX로 직접 추론하는 것은 엄밀히 라이선스 위반**에 해당
+- 프로덕션에서 LiveKit 모델을 사용하려면 반드시 LiveKit Agents 프레임워크를 통해 사용해야 함
+- 라이선스 제약 없이 자유롭게 사용하려면 **NAMO (Apache 2.0)** 또는 **Smart Turn v3 (BSD 2-Clause)** 선택 권장
+
+---
+
+## 10. NAMO 한국어 특화 모델 실측 테스트 결과
 
 ### 모델 정보
 
@@ -359,7 +392,7 @@ TP rate 99.3% 기준 false-positive rate 비교:
 
 ---
 
-## 10. 기타 Open-Weight Turn Detection 모델 조사
+## 11. 기타 Open-Weight Turn Detection 모델 조사
 
 NAMO, LiveKit, Turnsense 외에 한국어 적용 가능한 open-weight 모델을 추가 조사한 결과입니다.
 
