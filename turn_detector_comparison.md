@@ -46,28 +46,72 @@ Chinese, Dutch, English, French, German, Hindi, Indonesian, Italian, Japanese, K
 
 ---
 
-## 4. 아키텍처 접근 방식
+## 4. 모델 아키텍처 및 크기 비교
 
-### NAMO
+### NAMO Turn Detector v1
 
-- BERT 계열 인코더 모델 기반
-- ONNX 양자화로 최적화 (2.19x 속도 향상, 정확도 손실 <0.2%)
-- 다국어 모델(mmBERT)과 언어별 특화 모델(DistilBERT) 이원화 전략
-- 양자화 전후: 61.3ms → 28.0ms (다국어), 38ms → 14.9ms (단일)
+| 구분 | 다국어 모델 | 언어별 특화 모델 |
+|------|-----------|----------------|
+| **베이스 모델** | mmBERT (Multilingual BERT) | DistilBERT (distilbert-base-multilingual-cased) |
+| **모델 유형** | 인코더 (Encoder-only) | 인코더 (Encoder-only) |
+| **파라미터 수** | ~178M | ~66M |
+| **ONNX 파일 크기** | ~295MB (양자화) | ~135MB (비양자화) |
+| **최적화** | ONNX 양자화 (2.19x 속도 향상, 정확도 손실 <0.2%) | ONNX (양자화 버전 결함 있음) |
+| **추론 속도** | <29ms (양자화 전 61.3ms → 28.0ms) | <19ms (양자화 전 38ms → 14.9ms) |
+| **출력 방식** | 이진 분류 (0: CONT, 1: EOT) + softmax 확률 | 동일 |
+| **지원 언어** | 23개 | 언어별 1개 |
 
-### LiveKit
+### LiveKit Turn Detector
 
-- Knowledge Distillation 활용
-- Qwen2.5-7B 교사 모델 → Qwen2.5-0.5B 학생 모델로 증류
+| 구분 | 다국어 모델 (v0.4.1-intl) | 영어 전용 (deprecated) |
+|------|-------------------------|----------------------|
+| **베이스 모델** | Qwen2.5-0.5B-Instruct | SmolLM2-135M |
+| **교사 모델** | Qwen2.5-7B-Instruct (Knowledge Distillation) | - |
+| **모델 유형** | 디코더 (Decoder-only, LLM) | 디코더 (Decoder-only) |
+| **파라미터 수** | ~500M | ~135M |
+| **ONNX 파일 크기** | ~281MB (INT8 양자화) | ~66MB |
+| **추론 속도** | 50-160ms | 15-45ms |
+| **출력 방식** | `<\|im_end\|>` 토큰 출현 확률 + 언어별 임계값 비교 | 동일 |
+| **지원 언어** | 14개 | 영어만 |
+
+- Knowledge Distillation: 7B 교사 → 0.5B 학생 모델로 증류, ~1,500 스텝에서 수렴
 - VAD와 결합하여 사용 (대화 맥락 4턴 슬라이딩 윈도우)
 - v0.3 → v0.4.1에서 false-positive 중단 39% 감소 달성
 - 전화번호, 주소, 이메일 등 구조화 데이터 처리 강화
 
 ### Turnsense
 
-- SmolLM2-135M에 LoRA 파인튜닝
+| 구분 | 값 |
+|------|---|
+| **베이스 모델** | SmolLM2-135M (HuggingFace) |
+| **모델 유형** | 디코더 (Decoder-only) |
+| **파라미터 수** | ~135M |
+| **학습 방식** | LoRA Fine-tuning |
+| **학습 데이터** | TURNS-2K (2,000 샘플, 영어) |
+| **출력 방식** | 이진 분류 (EOT / CONT) |
+| **지원 언어** | 영어만 (한국어 불가 — 베이스 모델에 한국어 학습 데이터 없음) |
+
 - 엣지 디바이스(Raspberry Pi) 최적화가 핵심 목표
-- 가장 경량한 아키텍처
+- SmolLM2-135M은 영어 + 유럽 5개 언어만 지원 (한국어 미포함)
+
+### 핵심 아키텍처 차이
+
+```
+NAMO (인코더)
+  텍스트 → [mmBERT/DistilBERT] → softmax → EOT/CONT
+  · 텍스트를 통째로 입력받아 분류
+  · 가장 빠른 추론 속도
+
+LiveKit (디코더)
+  대화 컨텍스트 → [Qwen 채팅 템플릿] → [Qwen2.5-0.5B] → P(<|im_end|>)
+  · 대화 맥락(최대 4턴)을 포함하여 다음 토큰 확률로 판별
+  · Knowledge Distillation (7B → 0.5B)으로 품질 확보
+
+Turnsense (디코더)
+  텍스트 → [SmolLM2-135M + LoRA] → EOT/CONT
+  · 엣지 디바이스(Raspberry Pi) 타겟 경량 모델
+  · 영어 전용, 한국어 미지원
+```
 
 ---
 
